@@ -1,0 +1,26 @@
+{
+  "name": "OddsCopilot",
+  "version": "1.0.0",
+  "description": "A probability copilot for better personal decisions",
+  "main": "dist/index.js",
+  "bin": {
+    "odds-copilot": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js",
+    "demo": "tsc && node dist/demo.js"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "inquirer": "^8.2.5"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.3",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}
