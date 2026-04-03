@@ -26,9 +26,10 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Environment files (but keep example files)
+# Environment files (but keep example files and production)
 **/.env*
 !**/.env*.example
+!**/.env.production
 
 # Vercel
 .vercel
