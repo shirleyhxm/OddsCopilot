@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const { question, scenarios, apiKey } = await request.json();

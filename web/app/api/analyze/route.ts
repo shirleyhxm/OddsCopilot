@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildDecisionAnalysisPrompt, AIDecisionAnalysis } from '@/lib/ai/prompt';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const { decision, apiKey } = await request.json();
