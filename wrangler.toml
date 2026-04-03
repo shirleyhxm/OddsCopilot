@@ -3,12 +3,11 @@ name = "odds-copilot"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "web/.open-next/worker"
 
-# Cloudflare Pages configuration
-[build]
-command = "npm run build:cloudflare"
-
-# Environment variables will be set in Cloudflare dashboard
-# You'll need to add:
+# Note: Build configuration is set in Cloudflare Pages dashboard
+# Build command: npm run build:cloudflare
+# Build output directory: web/.open-next/worker
+#
+# Environment variables to set in Cloudflare dashboard:
 # - NEXT_PUBLIC_SUPABASE_URL
 # - NEXT_PUBLIC_SUPABASE_ANON_KEY
 # - ANTHROPIC_API_KEY
