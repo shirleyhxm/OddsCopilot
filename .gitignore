@@ -1,13 +1,42 @@
-/tmp
-/out-tsc
+# Dependencies
+**/node_modules
+**/.pnp
+.pnp.js
 
-/node_modules
+# Testing
+**/coverage
+
+# Next.js
+**/.next/
+**/out/
+**/out-tsc/
+
+# Production
+**/build
+**/dist
+/tmp
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-/.pnp
-.pnp.js
+lerna-debug.log*
 
+# Environment files (but keep example files)
+**/.env*
+!**/.env*.example
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
 .vscode/*
-
-.DS_Store
+.idea/*

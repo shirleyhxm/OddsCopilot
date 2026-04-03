@@ -3,88 +3,125 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 type LifeStage = 'early-career' | 'mid-career' | 'senior' | 'transitioning' | 'other'
 type RiskTolerance = 'conservative' | 'moderate' | 'growth-oriented'
 
-interface UserProfile {
-  name: string
-  lifeStage: LifeStage
-  riskTolerance: RiskTolerance
-  context: string
-  createdAt: string
-}
-
 export default function ProfilePage() {
   const router = useRouter()
+  const supabase = createClient()
   const [name, setName] = useState('')
   const [lifeStage, setLifeStage] = useState<LifeStage | null>(null)
   const [riskTolerance, setRiskTolerance] = useState<RiskTolerance | null>(null)
   const [context, setContext] = useState('')
   const [isLoaded, setIsLoaded] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem('userProfile')
-    if (!storedProfile) {
-      router.push('/welcome')
-      return
+    const loadProfile = async () => {
+      try {
+        // Check auth
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
+        setUserId(user.id)
+
+        // Load profile from Supabase
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) {
+          console.error('Failed to load profile:', profileError)
+          router.push('/welcome')
+          return
+        }
+
+        if (profileData) {
+          setName(profileData.name || '')
+          setLifeStage(profileData.life_stage)
+          setRiskTolerance(profileData.risk_tolerance)
+          setContext(profileData.context || '')
+          setIsLoaded(true)
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error)
+        router.push('/welcome')
+      }
     }
 
-    try {
-      const profile: UserProfile = JSON.parse(storedProfile)
-      setName(profile.name)
-      setLifeStage(profile.lifeStage)
-      setRiskTolerance(profile.riskTolerance)
-      setContext(profile.context)
-      setIsLoaded(true)
-    } catch (error) {
-      console.error('Failed to load profile:', error)
-      router.push('/welcome')
-    }
-  }, [router])
+    loadProfile()
+  }, [router, supabase])
 
-  const handleSave = () => {
-    if (!lifeStage || !riskTolerance) {
+  const handleSave = async () => {
+    if (!lifeStage || !riskTolerance || !userId) {
       return
     }
 
     setIsSaving(true)
+    setError('')
 
-    const storedProfile = localStorage.getItem('userProfile')
-    let createdAt = new Date().toISOString()
+    try {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          name: name || 'Friend',
+          life_stage: lifeStage,
+          risk_tolerance: riskTolerance,
+          context: context,
+        })
 
-    if (storedProfile) {
-      try {
-        const existingProfile = JSON.parse(storedProfile)
-        createdAt = existingProfile.createdAt
-      } catch (error) {
-        console.error('Failed to parse existing profile:', error)
-      }
-    }
+      if (updateError) throw updateError
 
-    const profile: UserProfile = {
-      name: name || 'Friend',
-      lifeStage,
-      riskTolerance,
-      context,
-      createdAt,
-    }
-
-    localStorage.setItem('userProfile', JSON.stringify(profile))
-
-    setTimeout(() => {
-      setIsSaving(false)
       router.push('/dashboard')
-    }, 500)
+    } catch (err: any) {
+      console.error('Error saving profile:', err)
+      setError(err.message || 'Failed to save profile')
+      setIsSaving(false)
+    }
   }
 
-  const handleResetData = () => {
-    if (confirm('Are you sure you want to reset all your data? This will delete your profile and all decision history.')) {
-      localStorage.removeItem('userProfile')
-      localStorage.removeItem('decisions')
+  const handleResetData = async () => {
+    if (!confirm('Are you sure you want to reset all your data? This will delete your account, profile, and all decision history. You will be signed out.')) {
+      return
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Delete all decisions first (due to foreign key constraints)
+      await supabase
+        .from('decisions')
+        .delete()
+        .eq('user_id', user.id)
+
+      // Delete profile
+      await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id)
+
+      // Sign out
+      await supabase.auth.signOut()
+
+      // Clear any local storage
+      localStorage.clear()
       sessionStorage.clear()
-      router.push('/welcome')
+
+      router.push('/login')
+    } catch (err) {
+      console.error('Error resetting data:', err)
+      alert('Failed to reset data. Please try again.')
     }
   }
 
@@ -239,6 +276,13 @@ export default function ProfilePage() {
               This helps me generate more relevant scenarios for your decisions.
             </div>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-dim border border-red/30 rounded-lg p-3">
+              <p className="text-red text-sm">{error}</p>
+            </div>
+          )}
 
           {/* Save Button */}
           <button

@@ -27,19 +27,23 @@ npm run dev                 # Run CLI demo
 - **TypeScript** throughout
 - **Tailwind CSS** with custom design system
 - **Anthropic Claude API** (Haiku 4.5 model: `claude-haiku-4-5-20251001`)
-- **Client-side data persistence** via localStorage/sessionStorage
+- **Supabase** - PostgreSQL database with authentication and Row Level Security
+- **Data persistence** - Supabase for user data, sessionStorage for API keys
 
 ### Application Flow
 
-1. **Welcome Flow** (`/welcome`) → Profile Setup
-2. **Dashboard** (`/dashboard`) → Decision History
-3. **New Decision** (`/new-decision`) → Decision Input
-4. **Analysis** (`/decision/[id]`) → Probability Estimation & Insight Generation
+1. **Authentication** (`/login`) → Sign up or sign in
+2. **Welcome Flow** (`/welcome`) → Profile Setup (new users only)
+3. **Dashboard** (`/dashboard`) → Decision History
+4. **New Decision** (`/new-decision`) → Decision Input
+5. **Analysis** (`/decision/[id]`) → Probability Estimation & Insight Generation
 
 ### Key Directories
 
 **`web/app/`** - Next.js App Router pages
-- `page.tsx` - Root redirect (checks for profile)
+- `page.tsx` - Root redirect (checks auth and profile)
+- `login/` - Authentication (sign up/sign in)
+- `auth/callback/` - Email confirmation handler
 - `welcome/` - Profile onboarding
 - `dashboard/` - Decision history and stats
 - `new-decision/` - Decision input form
@@ -54,12 +58,19 @@ npm run dev                 # Run CLI demo
 
 **`web/lib/`**
 - `ai/prompt.ts` - Claude prompt templates and interfaces
+- `supabase/client.ts` - Browser-side Supabase client
+- `supabase/server.ts` - Server-side Supabase client with cookie handling
 - `models/` - Decision, Scenario, Outcome classes (legacy CLI)
 - `engine/` - EV calculator, comparison engine (legacy CLI)
 
+**Database Schema** (`web/supabase-schema.sql`)**
+- Complete PostgreSQL schema with Row Level Security
+- Auto-generated UUIDs and timestamps
+- JSONB fields for flexible data storage
+
 ### Data Model
 
-**User Profile** (localStorage: `userProfile`):
+**User Profile** (Supabase: `profiles` table):
 ```typescript
 {
   name: string
@@ -70,7 +81,7 @@ npm run dev                 # Run CLI demo
 }
 ```
 
-**Decision** (localStorage: `decisions`):
+**Decision** (Supabase: `decisions` table):
 ```typescript
 {
   id: string
@@ -133,14 +144,20 @@ Located in `web/lib/ai/prompt.ts`:
 
 ### State Management
 
-**sessionStorage** (temporary):
-- `apiKey` - Anthropic API key (never persisted)
-- `currentAnalysis` - Current analysis data (navigation)
-- `currentDecisionId` - Current decision ID
+**Supabase Database** (persistent, server-side):
+- `profiles` table - User profile data with RLS
+- `decisions` table - All decision records with RLS
+- Row Level Security ensures users only access their own data
 
-**localStorage** (persistent):
-- `userProfile` - User profile data
-- `decisions` - Array of all decision records
+**sessionStorage** (temporary, client-side):
+- `apiKey` - Anthropic API key (never persisted to database)
+- `currentAnalysis` - Current analysis data (for navigation)
+- `currentDecisionId` - Current decision ID (for navigation)
+
+**Authentication:**
+- Cookie-based sessions via Supabase Auth
+- Email/password authentication with email confirmation
+- Automatic session refresh
 
 ### UI Architecture: Decision Analysis Page
 
@@ -223,7 +240,8 @@ The root `src/` directory contains a TypeScript CLI implementation with:
 1. Create `app/your-route/page.tsx`
 2. Use `'use client'` directive for interactivity
 3. Import consistent header with "ODDSMERA" link
-4. Check for profile in localStorage (redirect to `/welcome` if missing)
+4. Check for authentication and redirect to `/login` if not authenticated
+5. Load user data from Supabase using `supabase.auth.getUser()`
 
 ### Modifying AI Prompts
 1. Edit `web/lib/ai/prompt.ts`
@@ -236,16 +254,76 @@ The root `src/` directory contains a TypeScript CLI implementation with:
 2. Update `web/app/globals.css` for global styles
 3. Maintain consistency with existing text sizes and spacing
 
+### Supabase Configuration
+
+**Environment Variables** (`web/.env.local`):
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-publishable-api-key
+```
+
+**Client-side usage:**
+```typescript
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
+
+// Get authenticated user
+const { data: { user } } = await supabase.auth.getUser()
+
+// Query with automatic RLS
+const { data } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', user.id)
+  .single()
+```
+
+**Server-side usage** (for API routes or Server Components):
+```typescript
+import { createClient } from '@/lib/supabase/server'
+const supabase = createClient()
+
+// Same API, but with cookie-based session
+```
+
+**Setup Instructions:**
+See `docs/SUPABASE_SETUP.md` for complete setup guide including:
+- Creating a Supabase project
+- Running the database schema
+- Configuring email authentication
+- Environment variable setup
+
 ### Working with Decisions
 ```typescript
-// Load from localStorage
-const decisions = JSON.parse(localStorage.getItem('decisions') || '[]')
+import { createClient } from '@/lib/supabase/client'
+
+const supabase = createClient()
+
+// Load decisions for current user
+const { data: { user } } = await supabase.auth.getUser()
+const { data: decisions } = await supabase
+  .from('decisions')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false })
 
 // Update specific decision
-const updated = decisions.map(d =>
-  d.id === targetId ? { ...d, ...updates } : d
-)
-localStorage.setItem('decisions', JSON.stringify(updated))
+const { error } = await supabase
+  .from('decisions')
+  .update({ scenarios: updatedScenarios })
+  .eq('id', decisionId)
+
+// Insert new decision
+const { data, error } = await supabase
+  .from('decisions')
+  .insert({
+    user_id: user.id,
+    question: 'Should I...',
+    scenarios: [...],
+    // ... other fields
+  })
+  .select()
+  .single()
 ```
 
 ## Philosophy (Critical for AI Development)

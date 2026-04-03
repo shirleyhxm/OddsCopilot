@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface Scenario {
   id: string
@@ -38,6 +39,7 @@ interface Decision {
 export default function DecisionDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const supabase = createClient()
   const decisionId = params?.id as string
 
   const [decision, setDecision] = useState<Decision | null>(null)
@@ -55,31 +57,57 @@ export default function DecisionDetailPage() {
   useEffect(() => {
     if (!decisionId) return
 
-    // Load decision from localStorage
-    const storedDecisions = localStorage.getItem('decisions')
-    if (!storedDecisions) {
-      router.push('/dashboard')
-      return
-    }
+    const loadDecision = async () => {
+      try {
+        // Check auth
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
 
-    try {
-      const decisions = JSON.parse(storedDecisions)
-      const found = decisions.find((d: Decision) => d.id === decisionId)
+        // Load decision from Supabase
+        const { data: decisionData, error } = await supabase
+          .from('decisions')
+          .select('*')
+          .eq('id', decisionId)
+          .eq('user_id', user.id)
+          .single()
 
-      if (!found) {
+        if (error || !decisionData) {
+          console.error('Failed to load decision:', error)
+          router.push('/dashboard')
+          return
+        }
+
+        const formattedDecision: Decision = {
+          id: decisionData.id,
+          question: decisionData.question,
+          category: decisionData.category,
+          createdAt: decisionData.created_at,
+          decisionSummary: decisionData.decision_summary,
+          context: decisionData.context,
+          insiderPrompt: decisionData.insider_prompt,
+          scenarios: decisionData.scenarios || [],
+          keyFactors: decisionData.key_factors,
+          expectedValueScore: decisionData.expected_value_score,
+          sensitivityNote: decisionData.sensitivity_note,
+          outcome: decisionData.outcome,
+          insight: decisionData.insight,
+        }
+
+        setDecision(formattedDecision)
+        setScenarios(formattedDecision.scenarios || [])
+        setBaselineScenarios(JSON.parse(JSON.stringify(formattedDecision.scenarios || [])))
+        setInsight(formattedDecision.insight || '')
+      } catch (error) {
+        console.error('Error loading decision:', error)
         router.push('/dashboard')
-        return
       }
-
-      setDecision(found)
-      setScenarios(found.scenarios || [])
-      setBaselineScenarios(JSON.parse(JSON.stringify(found.scenarios || []))) // Deep copy
-      setInsight(found.insight || '')
-    } catch (error) {
-      console.error('Failed to load decision:', error)
-      router.push('/dashboard')
     }
-  }, [decisionId, router])
+
+    loadDecision()
+  }, [decisionId, router, supabase])
 
   const handleGenerateInsight = async () => {
     const apiKey = sessionStorage.getItem('apiKey')
@@ -139,19 +167,25 @@ export default function DecisionDetailPage() {
     setIsLoggingOutcome(false)
   }
 
-  const updateDecision = (updates: Partial<Decision>) => {
-    const storedDecisions = localStorage.getItem('decisions')
-    if (!storedDecisions) return
+  const updateDecision = async (updates: Partial<Decision>) => {
+    if (!decision) return
 
     try {
-      const decisions = JSON.parse(storedDecisions)
-      const index = decisions.findIndex((d: Decision) => d.id === decisionId)
+      // Map Decision interface fields to database column names
+      const dbUpdates: any = {}
+      if (updates.scenarios !== undefined) dbUpdates.scenarios = updates.scenarios
+      if (updates.insight !== undefined) dbUpdates.insight = updates.insight
+      if (updates.outcome !== undefined) dbUpdates.outcome = updates.outcome
 
-      if (index !== -1) {
-        decisions[index] = { ...decisions[index], ...updates }
-        localStorage.setItem('decisions', JSON.stringify(decisions))
-        setDecision(decisions[index])
-      }
+      const { error } = await supabase
+        .from('decisions')
+        .update(dbUpdates)
+        .eq('id', decisionId)
+
+      if (error) throw error
+
+      // Update local state
+      setDecision({ ...decision, ...updates })
     } catch (error) {
       console.error('Failed to update decision:', error)
     }

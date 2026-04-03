@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface UserProfile {
   name: string
@@ -27,48 +28,82 @@ interface Decision {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [calibrationScore, setCalibrationScore] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Load profile
-    const storedProfile = localStorage.getItem('userProfile')
-    if (!storedProfile) {
-      router.push('/welcome')
-      return
-    }
-
-    try {
-      const profileData = JSON.parse(storedProfile)
-      setProfile(profileData)
-    } catch (error) {
-      console.error('Failed to parse profile:', error)
-      router.push('/welcome')
-      return
-    }
-
-    // Load decisions
-    const storedDecisions = localStorage.getItem('decisions')
-    if (storedDecisions) {
+    const loadData = async () => {
       try {
-        const decisionsData = JSON.parse(storedDecisions)
-        setDecisions(decisionsData.sort((a: Decision, b: Decision) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ))
+        // Check auth
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
 
-        // Calculate calibration score
-        const decisionsWithOutcomes = decisionsData.filter((d: Decision) => d.outcome)
-        if (decisionsWithOutcomes.length > 0) {
-          // TODO: Implement proper calibration logic
-          // For now, just show a placeholder
-          setCalibrationScore(75)
+        // Load profile from Supabase
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) {
+          console.error('Failed to load profile:', profileError)
+          router.push('/welcome')
+          return
+        }
+
+        if (profileData) {
+          setProfile({
+            name: profileData.name || 'Friend',
+            lifeStage: profileData.life_stage,
+            riskTolerance: profileData.risk_tolerance,
+            context: profileData.context || '',
+            createdAt: profileData.created_at,
+          })
+        }
+
+        // Load decisions from Supabase
+        const { data: decisionsData, error: decisionsError } = await supabase
+          .from('decisions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (decisionsError) {
+          console.error('Failed to load decisions:', decisionsError)
+        } else if (decisionsData) {
+          const formattedDecisions = decisionsData.map((d) => ({
+            id: d.id,
+            question: d.question,
+            category: d.category,
+            createdAt: d.created_at,
+            scenarios: d.scenarios,
+            outcome: d.outcome,
+          }))
+          setDecisions(formattedDecisions)
+
+          // Calculate calibration score
+          const decisionsWithOutcomes = formattedDecisions.filter((d) => d.outcome)
+          if (decisionsWithOutcomes.length > 0) {
+            // TODO: Implement proper calibration logic
+            // For now, just show a placeholder
+            setCalibrationScore(75)
+          }
         }
       } catch (error) {
-        console.error('Failed to parse decisions:', error)
+        console.error('Error loading data:', error)
+      } finally {
+        setLoading(false)
       }
     }
-  }, [router])
+
+    loadData()
+  }, [router, supabase])
 
   const pendingOutcomes = decisions.filter(d => !d.outcome && d.scenarios)
 
@@ -92,7 +127,7 @@ export default function DashboardPage() {
     return colors[stage] || colors['other']
   }
 
-  if (!profile) {
+  if (loading || !profile) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-text3">Loading...</div>

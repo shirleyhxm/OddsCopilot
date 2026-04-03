@@ -2,32 +2,56 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 type LifeStage = 'early-career' | 'mid-career' | 'senior' | 'transitioning' | 'other'
 type RiskTolerance = 'conservative' | 'moderate' | 'growth-oriented'
 
 export default function WelcomePage() {
   const router = useRouter()
+  const supabase = createClient()
   const [name, setName] = useState('')
   const [lifeStage, setLifeStage] = useState<LifeStage | null>(null)
   const [riskTolerance, setRiskTolerance] = useState<RiskTolerance | null>(null)
   const [context, setContext] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = () => {
-    // Save profile to localStorage
-    const profile = {
-      name: name || 'Friend',
-      lifeStage,
-      riskTolerance,
-      context,
-      createdAt: new Date().toISOString(),
+  const handleSubmit = async () => {
+    if (!lifeStage || !riskTolerance) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      // Save profile to Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          name: name || 'Friend',
+          life_stage: lifeStage,
+          risk_tolerance: riskTolerance,
+          context: context,
+        })
+
+      if (profileError) throw profileError
+
+      // Redirect to dashboard
+      router.push('/dashboard')
+    } catch (err: any) {
+      console.error('Error saving profile:', err)
+      setError(err.message || 'Failed to save profile')
+    } finally {
+      setLoading(false)
     }
-
-    localStorage.setItem('userProfile', JSON.stringify(profile))
-    localStorage.setItem('decisions', JSON.stringify([]))
-
-    // Redirect to dashboard
-    router.push('/dashboard')
   }
 
   const lifeStages: { value: LifeStage; label: string }[] = [
@@ -162,17 +186,33 @@ export default function WelcomePage() {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-dim border border-red/30 rounded-lg p-3">
+              <p className="text-red text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || loading}
             className={`w-full py-4 rounded-lg font-medium transition-all ${
-              canSubmit
+              canSubmit && !loading
                 ? 'bg-amber hover:bg-amber/90 text-bg'
                 : 'bg-bg3 text-text3 cursor-not-allowed'
             }`}
           >
-            {canSubmit ? 'Start advising me →' : 'Please select life stage and risk tolerance'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-3">
+                <div className="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin" />
+                Saving profile...
+              </span>
+            ) : canSubmit ? (
+              'Start advising me →'
+            ) : (
+              'Please select life stage and risk tolerance'
+            )}
           </button>
         </div>
       </div>

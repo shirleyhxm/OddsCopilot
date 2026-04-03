@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 type Category = 'career' | 'financial' | 'personal' | 'health' | 'relocation' | 'education'
 
@@ -26,11 +27,33 @@ const exampleDecisions: Record<Category, string> = {
 
 export default function NewDecisionPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [category, setCategory] = useState<Category | null>(null)
   const [decision, setDecision] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const initialize = async () => {
+      // Check auth
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      setUserId(user.id)
+
+      // Load API key from sessionStorage
+      const storedApiKey = sessionStorage.getItem('apiKey')
+      if (storedApiKey) {
+        setApiKey(storedApiKey)
+      }
+    }
+
+    initialize()
+  }, [router, supabase])
 
   const handleLoadExample = () => {
     if (category) {
@@ -53,13 +76,20 @@ export default function NewDecisionPage() {
     setError('')
 
     try {
-      // Load user profile for context
-      const storedProfile = localStorage.getItem('userProfile')
-      let profileContext = ''
+      if (!userId) {
+        throw new Error('Not authenticated')
+      }
 
-      if (storedProfile) {
-        const profile = JSON.parse(storedProfile)
-        profileContext = `User context: ${profile.lifeStage} professional, ${profile.riskTolerance} risk tolerance. ${profile.context || ''}`
+      // Load user profile for context from Supabase
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      let profileContext = ''
+      if (profileData) {
+        profileContext = `User context: ${profileData.life_stage} professional, ${profileData.risk_tolerance} risk tolerance. ${profileData.context || ''}`
       }
 
       const response = await fetch('/api/analyze', {
@@ -83,33 +113,32 @@ export default function NewDecisionPage() {
       // Save API key for future use
       sessionStorage.setItem('apiKey', apiKey)
 
-      // Create decision record
-      const decisionRecord = {
-        id: Date.now().toString(),
-        question: decision,
-        category,
-        createdAt: new Date().toISOString(),
-        scenarios: data.analysis.scenarios,
-        decisionSummary: data.analysis.decisionSummary,
-        context: data.analysis.context,
-        insiderPrompt: data.analysis.insiderPrompt,
-        keyFactors: data.analysis.keyFactors,
-        expectedValueScore: data.analysis.expectedValueScore,
-        sensitivityNote: data.analysis.sensitivityNote,
-      }
+      // Save decision to Supabase
+      const { data: savedDecision, error: saveError } = await supabase
+        .from('decisions')
+        .insert({
+          user_id: userId,
+          question: decision,
+          category,
+          decision_summary: data.analysis.decisionSummary,
+          context: data.analysis.context,
+          insider_prompt: data.analysis.insiderPrompt,
+          scenarios: data.analysis.scenarios,
+          key_factors: data.analysis.keyFactors,
+          expected_value_score: data.analysis.expectedValueScore,
+          sensitivity_note: data.analysis.sensitivityNote,
+        })
+        .select()
+        .single()
 
-      // Save to localStorage
-      const storedDecisions = localStorage.getItem('decisions')
-      const decisions = storedDecisions ? JSON.parse(storedDecisions) : []
-      decisions.push(decisionRecord)
-      localStorage.setItem('decisions', JSON.stringify(decisions))
+      if (saveError) throw saveError
 
       // Save to sessionStorage for analysis page
       sessionStorage.setItem('currentAnalysis', JSON.stringify(data.analysis))
-      sessionStorage.setItem('currentDecisionId', decisionRecord.id)
+      sessionStorage.setItem('currentDecisionId', savedDecision.id)
 
       // Navigate to analysis page
-      router.push(`/decision/${decisionRecord.id}`)
+      router.push(`/decision/${savedDecision.id}`)
     } catch (err: any) {
       console.error('Error analyzing decision:', err)
       setError(err.message || 'Failed to analyze decision')
