@@ -9,6 +9,7 @@ pages_build_output_dir = "web/.vercel/output/static"
 # Build output directory: web/.vercel/output/static
 #
 # Environment variables to set in Cloudflare dashboard:
+# - NEXT_PUBLIC_SITE_URL (your Cloudflare Pages URL, e.g., https://odds-copilot.pages.dev)
 # - NEXT_PUBLIC_SUPABASE_URL (already in .env.production)
 # - NEXT_PUBLIC_SUPABASE_ANON_KEY (already in .env.production)
 # - ANTHROPIC_API_KEY (for API routes)
