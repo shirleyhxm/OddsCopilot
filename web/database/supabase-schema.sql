@@ -31,6 +31,7 @@ CREATE TABLE decisions (
   sensitivity_note TEXT,
   outcome JSONB,
   insight TEXT,
+  insight_scenarios JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -34,6 +34,7 @@ interface Decision {
     notes: string
   }
   insight?: string
+  insightScenarios?: Scenario[]
 }
 
 export default function DecisionDetailPage() {
@@ -46,6 +47,7 @@ export default function DecisionDetailPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [baselineScenarios, setBaselineScenarios] = useState<Scenario[]>([])
   const [insight, setInsight] = useState<string>('')
+  const [insightScenarios, setInsightScenarios] = useState<Scenario[]>([])
   const [isGeneratingInsight, setIsGeneratingInsight] = useState(false)
   const [insightError, setInsightError] = useState('')
 
@@ -100,6 +102,16 @@ export default function DecisionDetailPage() {
         setScenarios(formattedDecision.scenarios || [])
         setBaselineScenarios(JSON.parse(JSON.stringify(formattedDecision.scenarios || [])))
         setInsight(formattedDecision.insight || '')
+
+        // If insight exists, track the scenarios it was generated with
+        // For existing decisions without insight_scenarios field, use current scenarios as baseline
+        if (formattedDecision.insight) {
+          setInsightScenarios(
+            decisionData.insight_scenarios
+              ? JSON.parse(JSON.stringify(decisionData.insight_scenarios))
+              : JSON.parse(JSON.stringify(formattedDecision.scenarios || []))
+          )
+        }
       } catch (error) {
         console.error('Error loading decision:', error)
         router.push('/dashboard')
@@ -141,9 +153,10 @@ export default function DecisionDetailPage() {
 
       const newInsight = result.insight || 'No insight returned'
       setInsight(newInsight)
+      setInsightScenarios(JSON.parse(JSON.stringify(scenarios)))
 
-      // Save insight to decision
-      updateDecision({ insight: newInsight })
+      // Save insight and scenarios snapshot to decision
+      updateDecision({ insight: newInsight, insightScenarios: scenarios })
     } catch (error: any) {
       console.error('Error generating insight:', error)
       setInsightError(error.message || 'Failed to generate insight')
@@ -175,6 +188,7 @@ export default function DecisionDetailPage() {
       const dbUpdates: any = {}
       if (updates.scenarios !== undefined) dbUpdates.scenarios = updates.scenarios
       if (updates.insight !== undefined) dbUpdates.insight = updates.insight
+      if (updates.insightScenarios !== undefined) dbUpdates.insight_scenarios = updates.insightScenarios
       if (updates.outcome !== undefined) dbUpdates.outcome = updates.outcome
 
       const { error } = await supabase
@@ -223,6 +237,12 @@ export default function DecisionDetailPage() {
 
   const totalProbability = scenarios.reduce((sum, s) => sum + s.probability, 0)
 
+  // Check if scenarios have changed since insight was generated
+  const scenariosChanged = insight && insightScenarios.length > 0 && scenarios.some((scenario, index) => {
+    const insightScenario = insightScenarios[index]
+    return insightScenario && Math.abs(scenario.probability - insightScenario.probability) >= 2
+  })
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
@@ -252,9 +272,9 @@ export default function DecisionDetailPage() {
         </Link>
       </header>
 
-      <div className="flex">
+      <div className="flex px-6 max-w-[2000px] mx-auto">
         {/* Main Content */}
-        <main className="flex-1 p-8 max-w-4xl">
+        <main className="flex-1 p-8 min-w-0">
           {/* Decision Reframe */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-3">
@@ -497,21 +517,49 @@ export default function DecisionDetailPage() {
             </div>
           )}
 
-          {/* Generated Insight */}
-          {insight && (
-            <div className="bg-bg2 border border-border rounded-lg p-6 mb-8">
+        </main>
+
+        {/* Middle Column - Decision Insight */}
+        {insight && (
+          <aside className="flex-1 border-l border-border p-8 min-w-0 sticky top-0 h-screen overflow-y-auto animate-slide-in">
+            <div className="bg-bg2 border border-border rounded-lg p-6">
               <h3 className="text-text3 text-xs uppercase tracking-wider mb-4">
                 Decision Insight
               </h3>
+
+              {/* Stale insight warning */}
+              {scenariosChanged && (
+                <div className="mb-4 bg-amber-glow border border-amber/30 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="text-amber text-lg">⚠</div>
+                    <div>
+                      <div className="text-amber text-xs font-medium mb-1">
+                        Your estimates have changed
+                      </div>
+                      <div className="text-text2 text-xs leading-relaxed mb-2">
+                        This insight was generated with different probability estimates. Generate a new insight to reflect your updated thinking.
+                      </div>
+                      <button
+                        onClick={handleGenerateInsight}
+                        disabled={isGeneratingInsight}
+                        className="text-amber text-xs hover:underline font-medium"
+                      >
+                        Regenerate insight →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="text-text2 text-sm leading-relaxed whitespace-pre-line">
                 {insight}
               </div>
             </div>
-          )}
-        </main>
+          </aside>
+        )}
 
-        {/* Sidebar */}
-        <aside className="w-96 border-l border-border p-8 sticky top-0 h-screen overflow-y-auto">
+        {/* Right Sidebar - Expected Value & Intelligence */}
+        <aside className="w-80 flex-shrink-0 border-l border-border p-8 sticky top-0 h-screen overflow-y-auto">
           {/* Expected Value Score */}
           <div className="bg-bg2 border border-border rounded-lg p-6 mb-6">
             <h3 className="text-text3 text-xs uppercase tracking-wider mb-4">
@@ -634,6 +682,21 @@ export default function DecisionDetailPage() {
           background: white;
           cursor: pointer;
           border: 2px solid #E8A038;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        .animate-slide-in {
+          animation: slideIn 0.4s ease-out;
         }
       `}</style>
     </div>
