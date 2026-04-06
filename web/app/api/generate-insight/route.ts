@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 
 export const runtime = 'edge';
 
@@ -13,8 +12,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const anthropic = new Anthropic({ apiKey });
 
     const scenarioSummary = scenarios
       .map((s: any) => `${s.name} (${s.probability}%): ${s.description}`)
@@ -39,13 +36,34 @@ Remember: Your role is to make the probability math visible and help them think 
 
 Return ONLY the insight text, no JSON or formatting.`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
+    // Call Claude API directly using fetch (works with Edge runtime)
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
-    const insight = message.content[0].type === 'text' ? message.content[0].text : '';
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return NextResponse.json(
+        {
+          error: 'Failed to call Anthropic API',
+          details: errorData.error?.message || 'Unknown error'
+        },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    const insight = data.content?.[0]?.type === 'text' ? data.content[0].text : '';
 
     return NextResponse.json({ insight });
 
