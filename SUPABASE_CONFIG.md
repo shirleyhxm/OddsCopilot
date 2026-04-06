@@ -4,14 +4,14 @@
 
 ### 1. Email Templates (Authentication → Email Templates)
 
-Update the **Confirm signup** email template to use the implicit flow:
+Update the **Confirm signup** email template to use Supabase's confirmation URL:
 
 **Redirect URL:**
 ```
-{{ .SiteURL }}/auth/callback#access_token={{ .TokenHash }}&type=signup
+{{ .ConfirmationURL }}
 ```
 
-This uses the hash-based (implicit) flow which works across devices without requiring PKCE code verifiers stored in localStorage.
+This uses Supabase's server-side confirmation endpoint which will handle the email verification and then redirect to your callback URL.
 
 ### 2. Redirect URLs (Authentication → URL Configuration)
 

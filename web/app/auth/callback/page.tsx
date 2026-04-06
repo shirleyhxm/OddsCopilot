@@ -10,32 +10,61 @@ export default function AuthCallbackPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Supabase automatically parses the hash and sets the session
-    // We just need to wait for it to complete and then redirect
-
     const handleAuthCallback = async () => {
-      // Check for errors in URL params
-      const urlParams = new URLSearchParams(window.location.search)
-      const errorDescription = urlParams.get('error_description')
+      try {
+        // Check for errors in URL params first
+        const urlParams = new URLSearchParams(window.location.search)
+        const errorDescription = urlParams.get('error_description')
+        const errorCode = urlParams.get('error')
 
-      if (errorDescription) {
-        setError(errorDescription)
-        setTimeout(() => router.push('/login'), 3000)
-        return
-      }
+        if (errorDescription || errorCode) {
+          setError(errorDescription || errorCode || 'Authentication failed')
+          setTimeout(() => router.push('/login'), 3000)
+          return
+        }
 
-      // Wait a moment for Supabase to parse the hash
-      await new Promise(resolve => setTimeout(resolve, 500))
+        // Supabase automatically handles the token exchange from URL hash
+        // Wait a bit for the SDK to process it
+        await new Promise(resolve => setTimeout(resolve, 1000))
 
-      // Check if we have a session now
-      const { data: { session } } = await supabase.auth.getSession()
+        // Check if we have an authenticated session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-      if (session) {
-        // User is authenticated, redirect to welcome
-        router.push('/welcome')
-      } else {
-        // No session established, something went wrong
-        setError('Failed to establish session')
+        if (sessionError) {
+          console.error('Session error:', sessionError)
+          setError('Failed to get session')
+          setTimeout(() => router.push('/login'), 3000)
+          return
+        }
+
+        if (session) {
+          console.log('Session established, user:', session.user.email)
+          // User is authenticated, redirect to welcome
+          router.push('/welcome')
+        } else {
+          // No session, check if there's a token in the hash that we can use
+          const hashParams = new URLSearchParams(window.location.hash.substring(1))
+          const accessToken = hashParams.get('access_token')
+
+          if (accessToken) {
+            console.log('Found access token in hash, waiting longer...')
+            // Token exists but session not ready, wait a bit more
+            await new Promise(resolve => setTimeout(resolve, 1500))
+
+            const { data: { session: retrySession } } = await supabase.auth.getSession()
+            if (retrySession) {
+              router.push('/welcome')
+              return
+            }
+          }
+
+          console.error('No session established')
+          setError('Authentication failed - please try logging in')
+          setTimeout(() => router.push('/login'), 3000)
+        }
+      } catch (err) {
+        console.error('Auth callback error:', err)
+        setError(err instanceof Error ? err.message : 'Unknown error')
         setTimeout(() => router.push('/login'), 3000)
       }
     }
