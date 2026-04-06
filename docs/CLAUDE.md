@@ -292,6 +292,33 @@ See `docs/SUPABASE_SETUP.md` for complete setup guide including:
 - Running the database schema
 - Configuring email authentication
 - Environment variable setup
+- Cloudflare Pages deployment configuration
+
+### Email Confirmation Flow (Cloudflare Pages)
+
+**Challenge**: Cloudflare Workers/Pages edge runtime has compatibility issues with `@supabase/ssr` server-side auth.
+
+**Solution**: Client-side callback handler that works reliably:
+
+1. **Supabase Email Template** uses `{{ .ConfirmationURL }}`
+   - Confirms email server-side on Supabase
+   - Redirects to app with session token in URL hash
+
+2. **Client Callback Page** (`web/app/auth/callback/page.tsx`)
+   - Waits for Supabase SDK to parse hash and establish session
+   - Verifies session exists before redirecting
+   - Shows errors if auth fails
+
+3. **Environment Setup**
+   - `NEXT_PUBLIC_SITE_URL` in `.env.production` must be production URL
+   - Supabase Site URL must match (no trailing `/welcome` or other paths)
+   - Redirect URLs must include exact `/auth/callback` path
+
+**Key Learnings**:
+- Don't use preview deployment URLs (they change per deploy)
+- `{{ .ConfirmationURL }}` is required for proper email verification
+- Client-side flow avoids PKCE code verifier cross-device issues
+- Always wait ~1000ms for Supabase SDK to process hash tokens
 
 ### Working with Decisions
 ```typescript

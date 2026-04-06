@@ -44,10 +44,28 @@
 
 ## Step 5: Configure Email Authentication
 
+### Enable Email Provider
 1. Click "Authentication" in the left sidebar
 2. Click "Providers"
 3. Find "Email" and make sure it's enabled (should be by default)
-4. (Optional) Click "Email Templates" to customize signup/reset emails
+
+### Configure URL Settings (CRITICAL for Cloudflare Pages)
+1. Click "Authentication" → "URL Configuration"
+2. Set **Site URL** to your production URL:
+   - Production: `https://odds-copilot.pages.dev`
+   - Local dev: `http://localhost:3000`
+3. Add **Redirect URLs**:
+   - `https://odds-copilot.pages.dev/auth/callback`
+   - `http://localhost:3000/auth/callback` (for local development)
+
+### Verify Email Template
+1. Click "Email Templates" in Authentication
+2. Open "Confirm signup" template
+3. **Important**: Make sure the confirmation link uses:
+   ```
+   {{ .ConfirmationURL }}
+   ```
+   This is Supabase's built-in URL that confirms the email server-side and redirects with a session token.
 
 ## Step 6: Restart Your Dev Server
 
@@ -83,7 +101,12 @@ npm run dev
 
 ### "Localhost redirect not working"
 - In Supabase dashboard: Authentication > URL Configuration
-- Add `http://localhost:3000/**` to "Redirect URLs"
+- Add `http://localhost:3000/auth/callback` to "Redirect URLs"
+
+### "Email confirmed but user not logged in"
+- Check that Site URL is set correctly (no trailing paths like `/welcome`)
+- Verify email template uses `{{ .ConfirmationURL }}`
+- Ensure redirect URLs include `/auth/callback` endpoint
 
 ## Next Steps
 
@@ -150,3 +173,39 @@ Two main tables with Row Level Security (RLS):
 - Users can only read/write their own data
 - API keys stored in sessionStorage (never in database)
 - Publishable API key is safe for client-side use
+
+## Cloudflare Pages Deployment
+
+### Environment Variables
+Set in Cloudflare Pages dashboard (Settings → Environment variables):
+
+**Production environment variables** (in `web/.env.production`):
+```bash
+NEXT_PUBLIC_SITE_URL=https://odds-copilot.pages.dev
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-publishable-key
+```
+
+**Important**:
+- `NEXT_PUBLIC_SITE_URL` must be the production URL, not preview deployment URLs
+- Preview deployments (like `abc123.odds-copilot.pages.dev`) are temporary
+- The main URL `odds-copilot.pages.dev` automatically points to the latest deployment
+
+### Email Confirmation Flow
+
+The auth callback implements a client-side handler that:
+1. Receives the Supabase confirmation redirect with session token in URL hash
+2. Waits for Supabase SDK to parse the hash and establish the session
+3. Redirects authenticated user to `/welcome` page
+
+**Key files**:
+- `web/app/auth/callback/page.tsx` - Client-side callback handler
+- `web/app/login/page.tsx` - Sets `emailRedirectTo` using `NEXT_PUBLIC_SITE_URL`
+
+### Why Client-Side Callback?
+
+Cloudflare Pages uses edge runtime which has compatibility issues with `@supabase/ssr` server-side code. The client-side approach:
+- ✅ Works reliably on Cloudflare Workers/Pages
+- ✅ No PKCE code verifier issues across devices
+- ✅ Supabase handles email confirmation server-side via `{{ .ConfirmationURL }}`
+- ✅ Session established automatically when user lands on callback page
