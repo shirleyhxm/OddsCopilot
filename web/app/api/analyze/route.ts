@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { buildDecisionAnalysisPrompt, AIDecisionAnalysis } from '@/lib/ai/prompt';
 
-// Use Node.js runtime for better SDK compatibility
-export const runtime = 'nodejs';
+// Use Edge runtime for Cloudflare Pages compatibility
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,29 +15,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Anthropic client with user's API key
-    const anthropic = new Anthropic({
-      apiKey: apiKey,
-    });
-
     // Build the prompt
     const prompt = buildDecisionAnalysisPrompt(decision);
 
-    // Call Claude API
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    // Call Claude API directly using fetch (works with Edge runtime)
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+
+      if (response.status === 401) {
+        return NextResponse.json(
+          { error: 'Invalid API key' },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error: 'Failed to call Anthropic API',
+          details: errorData.error?.message || 'Unknown error'
+        },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+
     // Extract the JSON from the response
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
+    const responseText = data.content?.[0]?.type === 'text'
+      ? data.content[0].text
       : '';
 
     // Parse JSON response
@@ -74,13 +97,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Error calling Anthropic API:', error);
-
-    if (error?.status === 401) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    }
 
     return NextResponse.json(
       {
