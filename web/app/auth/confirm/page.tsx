@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function AuthConfirmPage() {
+function AuthConfirmContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
@@ -82,5 +82,29 @@ export default function AuthConfirmPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
+      <div className="w-full max-w-md text-center">
+        <div className="text-amber text-xs font-medium tracking-[0.3em] uppercase mb-6">
+          ODDSMERA
+        </div>
+        <div className="space-y-4">
+          <div className="text-text text-lg">Loading...</div>
+          <div className="w-12 h-12 border-2 border-amber border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function AuthConfirmPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <AuthConfirmContent />
+    </Suspense>
   )
 }
