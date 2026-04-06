@@ -2,38 +2,46 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check if there's a hash with token data (implicit flow)
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const accessToken = hashParams.get('access_token')
-    const refreshToken = hashParams.get('refresh_token')
-    const type = hashParams.get('type')
+    // Supabase automatically parses the hash and sets the session
+    // We just need to wait for it to complete and then redirect
 
-    if (type === 'signup' && accessToken && refreshToken) {
-      // Email confirmed successfully, redirect to welcome
-      router.push('/welcome')
-    } else if (type === 'recovery') {
-      // Password recovery flow
-      router.push('/reset-password')
-    } else {
-      // Check URL params for error
+    const handleAuthCallback = async () => {
+      // Check for errors in URL params
       const urlParams = new URLSearchParams(window.location.search)
       const errorDescription = urlParams.get('error_description')
 
       if (errorDescription) {
         setError(errorDescription)
         setTimeout(() => router.push('/login'), 3000)
-      } else {
-        // No token in hash, redirect to welcome anyway
+        return
+      }
+
+      // Wait a moment for Supabase to parse the hash
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Check if we have a session now
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session) {
+        // User is authenticated, redirect to welcome
         router.push('/welcome')
+      } else {
+        // No session established, something went wrong
+        setError('Failed to establish session')
+        setTimeout(() => router.push('/login'), 3000)
       }
     }
-  }, [router])
+
+    handleAuthCallback()
+  }, [router, supabase])
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-6">
