@@ -104,7 +104,16 @@ export default function NewDecisionPage() {
         }),
       })
 
-      const data = await response.json()
+      // Read response as text first
+      const responseText = await response.text()
+
+      let data
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        // If we can't parse JSON, show the text response
+        throw new Error(`Server error: ${responseText.substring(0, 200)}`)
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to analyze decision')
