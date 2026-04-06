@@ -1,14 +1,43 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-import { NextRequest } from 'next/server'
+import { type NextRequest } from 'next/server'
 
-export const runtime = 'edge';
-
-// Redirect to a client component to handle auth callback
-// This avoids edge runtime compatibility issues with @supabase/ssr
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
+  const origin = requestUrl.origin
 
-  // Redirect to client-side callback handler
-  return NextResponse.redirect(`${origin}/auth/confirm?code=${code || ''}`)
+  const response = NextResponse.redirect(`${origin}/welcome`)
+
+  if (code) {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          },
+          remove(name: string, options: CookieOptions) {
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+          },
+        },
+      }
+    )
+
+    await supabase.auth.exchangeCodeForSession(code)
+  }
+
+  return response
 }
