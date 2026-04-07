@@ -1,19 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Pre-select sign-up mode if coming from a "sign up" CTA
+    if (searchParams.get('signup') === 'true') {
+      setIsSignUp(true)
+    }
+  }, [searchParams])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -178,12 +187,34 @@ export default function LoginPage() {
           </div>
         </form>
 
+        {/* Try it first */}
+        <div className="mt-6 text-center">
+          <Link
+            href="/try"
+            className="text-text3 text-xs hover:text-amber transition-colors"
+          >
+            Not ready to sign up? Try it first →
+          </Link>
+        </div>
+
         {/* Privacy Note */}
-        <div className="mt-8 text-center text-text3 text-xs">
+        <div className="mt-4 text-center text-text3 text-xs">
           <p>Your data is encrypted and secure.</p>
           <p>We never share your personal information.</p>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="text-text3 text-sm">Loading...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
