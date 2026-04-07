@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "pages:deploy": "wrangler pages deploy",
-    "pages:dev": "wrangler pages dev .open-next/worker"
+    "pages:dev": "wrangler pages dev .open-next"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",

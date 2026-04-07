@@ -61,5 +61,5 @@ Routes without this declaration or using `nodejs` runtime will fail during Cloud
 
 - **Local development:** `npm run dev`
 - **Cloudflare build:** `npm run build:cloudflare`
-- Build tool: `@cloudflare/next-on-pages`
-- Output directory: `web/.vercel/output/static`
+- Build tool: `@opennextjs/cloudflare`
+- Output directory: `web/.open-next`
