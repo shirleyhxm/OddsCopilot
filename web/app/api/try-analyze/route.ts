@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { buildDecisionAnalysisPrompt, AIDecisionAnalysis } from '@/lib/ai/prompt';
 
 export const runtime = 'edge';
@@ -23,22 +22,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const anthropic = new Anthropic({ apiKey });
-
     const decisionWithCategory = category
       ? `Category: ${category}\n\n${decision}`
       : decision;
 
     const prompt = buildDecisionAnalysisPrompt(decisionWithCategory);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
-      messages: [{ role: 'user', content: prompt }],
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return NextResponse.json(
+        { error: 'Failed to call Anthropic API', details: errorData.error?.message || 'Unknown error' },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    const responseText = data.content?.[0]?.type === 'text'
+      ? data.content[0].text
       : '';
 
     let analysis: AIDecisionAnalysis;
