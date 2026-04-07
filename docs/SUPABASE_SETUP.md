@@ -52,10 +52,10 @@
 ### Configure URL Settings (CRITICAL for Cloudflare Pages)
 1. Click "Authentication" → "URL Configuration"
 2. Set **Site URL** to your production URL:
-   - Production: `https://odds-copilot.vercel.dev`
+   - Production: `https://odds-copilot.vercel.app`
    - Local dev: `http://localhost:3000`
 3. Add **Redirect URLs**:
-   - `https://odds-copilot.vercel.dev/auth/callback`
+   - `https://odds-copilot.vercel.app/auth/callback`
    - `http://localhost:3000/auth/callback` (for local development)
 
 ### Verify Email Template
@@ -181,15 +181,15 @@ Set in Cloudflare Pages dashboard (Settings → Environment variables):
 
 **Production environment variables** (in `web/.env.production`):
 ```bash
-NEXT_PUBLIC_SITE_URL=https://odds-copilot.vercel.dev
+NEXT_PUBLIC_SITE_URL=https://odds-copilot.vercel.app
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-publishable-key
 ```
 
 **Important**:
 - `NEXT_PUBLIC_SITE_URL` must be the production URL, not preview deployment URLs
-- Preview deployments (like `abc123.odds-copilot.vercel.dev`) are temporary
-- The main URL `odds-copilot.vercel.dev` automatically points to the latest deployment
+- Preview deployments (like `abc123.odds-copilot.vercel.app`) are temporary
+- The main URL `odds-copilot.vercel.app` automatically points to the latest deployment
 
 ### Email Confirmation Flow
 
