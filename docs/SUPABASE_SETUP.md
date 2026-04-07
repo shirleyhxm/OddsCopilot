@@ -49,7 +49,7 @@
 2. Click "Providers"
 3. Find "Email" and make sure it's enabled (should be by default)
 
-### Configure URL Settings (CRITICAL for Cloudflare Pages)
+### Configure URL Settings (CRITICAL)
 1. Click "Authentication" → "URL Configuration"
 2. Set **Site URL** to your production URL:
    - Production: `https://odds-copilot.vercel.app`
@@ -174,10 +174,10 @@ Two main tables with Row Level Security (RLS):
 - API keys stored in sessionStorage (never in database)
 - Publishable API key is safe for client-side use
 
-## Cloudflare Pages Deployment
+## Vercel Deployment
 
 ### Environment Variables
-Set in Cloudflare Pages dashboard (Settings → Environment variables):
+Set in Vercel project dashboard (Settings → Environment Variables):
 
 **Production environment variables** (in `web/.env.production`):
 ```bash
@@ -204,8 +204,8 @@ The auth callback implements a client-side handler that:
 
 ### Why Client-Side Callback?
 
-Cloudflare Pages uses edge runtime which has compatibility issues with `@supabase/ssr` server-side code. The client-side approach:
-- ✅ Works reliably on Cloudflare Workers/Pages
+The client-side approach provides reliable authentication:
+- ✅ Works reliably with Vercel Edge runtime
 - ✅ No PKCE code verifier issues across devices
 - ✅ Supabase handles email confirmation server-side via `{{ .ConfirmationURL }}`
 - ✅ Session established automatically when user lands on callback page

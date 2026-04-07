@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildDecisionAnalysisPrompt, AIDecisionAnalysis } from '@/lib/ai/prompt';
 
-// Use Edge runtime for Cloudflare Pages compatibility
+// Use Edge runtime for optimal Vercel performance
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {

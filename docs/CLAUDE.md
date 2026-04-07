@@ -292,11 +292,9 @@ See `docs/SUPABASE_SETUP.md` for complete setup guide including:
 - Running the database schema
 - Configuring email authentication
 - Environment variable setup
-- Cloudflare Pages deployment configuration
+- Vercel deployment configuration
 
-### Email Confirmation Flow (Cloudflare Pages)
-
-**Challenge**: Cloudflare Workers/Pages edge runtime has compatibility issues with `@supabase/ssr` server-side auth.
+### Email Confirmation Flow
 
 **Solution**: Client-side callback handler that works reliably:
 

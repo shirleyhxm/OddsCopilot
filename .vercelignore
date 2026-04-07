@@ -29,7 +29,3 @@ build
 
 # Database
 database/
-
-# Cloudflare
-.wrangler
-wrangler.toml
