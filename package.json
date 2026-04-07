@@ -21,7 +21,8 @@
   "devDependencies": {
     "@types/inquirer": "^9.0.3",
     "@types/node": "^20.0.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vercel": "^50.41.0"
   },
   "private": true
 }

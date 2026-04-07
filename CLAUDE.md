@@ -2,21 +2,25 @@
 
 This document contains important technical notes and constraints for the OddsCopilot project.
 
-## Cloudflare Pages Deployment Constraints
+## Vercel Deployment
 
-### Edge Runtime Requirement
+**IMPORTANT:** This project is deployed to Vercel, which natively supports Next.js and Edge runtime without any build adapters.
 
-**IMPORTANT:** This project is deployed to Cloudflare Pages, which **requires all dynamic routes to use Edge runtime**.
+### Why Vercel?
+
+- ✅ Native Next.js support (no adapters needed)
+- ✅ Full Edge runtime compatibility
+- ✅ No async_hooks issues
+- ✅ Automatic deployments from GitHub
+- ✅ Built-in analytics and monitoring
 
 ### Anthropic API Integration
 
-**DO NOT use the `@anthropic-ai/sdk` package in API routes.**
+**Use direct `fetch` calls instead of the `@anthropic-ai/sdk` package in Edge runtime routes.**
 
-The Anthropic SDK has compatibility issues with Edge runtime:
-- It imports Node.js built-in modules like `async_hooks` which are not available in Cloudflare Workers
-- Using the SDK causes runtime errors: "No such module async_hooks"
+Why: The Anthropic SDK has compatibility issues with Edge runtime in some deployment environments.
 
-**Solution:** Use direct `fetch` calls to the Anthropic API instead:
+**Solution:** Use direct `fetch` calls to the Anthropic API:
 
 ```typescript
 export const runtime = 'edge';
@@ -41,25 +45,51 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### All API Routes Must Use Edge Runtime
+### API Routes Configuration
 
-All routes in `/app/api/` must have:
+All routes in `/app/api/` use Edge runtime for optimal performance:
 ```typescript
 export const runtime = 'edge';
 ```
-
-Routes without this declaration or using `nodejs` runtime will fail during Cloudflare Pages deployment.
 
 ## Related Files
 
 - `/web/app/api/analyze/route.ts` - Decision analysis endpoint
 - `/web/app/api/generate-insight/route.ts` - Insight generation endpoint
 - `/web/app/api/test-connection/route.ts` - API key validation endpoint
-- `wrangler.toml` - Cloudflare configuration
+- `vercel.json` - Vercel configuration
+
+## Deployment
+
+### Environment Variables
+
+Set these in your Vercel project settings:
+
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `NEXT_PUBLIC_SITE_URL` - Your production URL
+
+### Deploy to Vercel
+
+1. **Via Vercel CLI:**
+   ```bash
+   npx vercel
+   ```
+
+2. **Via GitHub Integration:**
+   - Connect your repository to Vercel
+   - Automatic deployments on every push to main
+
+### Local Development
+
+```bash
+cd web
+npm install
+npm run dev
+```
 
 ## Build Process
 
-- **Local development:** `npm run dev`
-- **Cloudflare build:** `npm run build:cloudflare`
-- Build tool: `@cloudflare/next-on-pages`
-- Output directory: `web/.vercel/output/static`
+- **Local development:** `cd web && npm run dev`
+- **Production build:** `cd web && npm run build`
+- **Framework:** Next.js with native Vercel deployment
