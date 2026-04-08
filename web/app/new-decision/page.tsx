@@ -30,7 +30,6 @@ export default function NewDecisionPage() {
   const supabase = createClient()
   const [category, setCategory] = useState<Category | null>(null)
   const [decision, setDecision] = useState('')
-  const [apiKey, setApiKey] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
@@ -44,12 +43,6 @@ export default function NewDecisionPage() {
         return
       }
       setUserId(user.id)
-
-      // Load API key from sessionStorage
-      const storedApiKey = sessionStorage.getItem('apiKey')
-      if (storedApiKey) {
-        setApiKey(storedApiKey)
-      }
     }
 
     initialize()
@@ -64,11 +57,6 @@ export default function NewDecisionPage() {
   const handleAnalyze = async () => {
     if (!decision.trim()) {
       setError('Please describe your decision')
-      return
-    }
-
-    if (!apiKey.trim()) {
-      setError('Please enter your Anthropic API key')
       return
     }
 
@@ -99,7 +87,6 @@ export default function NewDecisionPage() {
         },
         body: JSON.stringify({
           decision: decision + '\n\n' + profileContext,
-          apiKey,
           category,
         }),
       })
@@ -118,9 +105,6 @@ export default function NewDecisionPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to analyze decision')
       }
-
-      // Save API key for future use
-      sessionStorage.setItem('apiKey', apiKey)
 
       // Save decision to Supabase
       const { data: savedDecision, error: saveError } = await supabase
@@ -249,31 +233,6 @@ export default function NewDecisionPage() {
           </div>
         </div>
 
-        {/* API Key Input */}
-        <div className="mb-8">
-          <label className="block text-text3 text-xs uppercase tracking-wider mb-4">
-            Anthropic API Key
-          </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-ant-..."
-            className="w-full bg-bg3 border border-border text-text px-4 py-3 rounded-lg focus:outline-none focus:border-amber/50 transition-colors text-sm font-mono"
-          />
-          <div className="text-text3 text-xs mt-2">
-            Your API key is stored locally and never sent to our servers.{' '}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-amber hover:underline"
-            >
-              Get your API key →
-            </a>
-          </div>
-        </div>
-
         {/* Error Message */}
         {error && (
           <div className="mb-8 bg-red-dim border border-red/30 rounded-lg p-4">
@@ -284,9 +243,9 @@ export default function NewDecisionPage() {
         {/* Submit Button */}
         <button
           onClick={handleAnalyze}
-          disabled={isAnalyzing || !decision.trim() || !apiKey.trim()}
+          disabled={isAnalyzing || !decision.trim()}
           className={`w-full py-4 rounded-lg font-medium transition-all ${
-            isAnalyzing || !decision.trim() || !apiKey.trim()
+            isAnalyzing || !decision.trim()
               ? 'bg-bg3 text-text3 cursor-not-allowed'
               : 'bg-amber hover:bg-amber/90 text-bg'
           }`}

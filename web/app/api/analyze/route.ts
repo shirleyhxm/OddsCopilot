@@ -6,12 +6,20 @@ export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
-    const { decision, apiKey } = await request.json();
+    const { decision } = await request.json();
 
-    if (!decision || !apiKey) {
+    if (!decision) {
       return NextResponse.json(
-        { error: 'Decision text and API key are required' },
+        { error: 'Decision text is required' },
         { status: 400 }
+      );
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503 }
       );
     }
 

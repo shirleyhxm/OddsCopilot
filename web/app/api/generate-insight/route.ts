@@ -4,12 +4,20 @@ export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, scenarios, apiKey } = await request.json();
+    const { question, scenarios } = await request.json();
 
-    if (!question || !scenarios || !apiKey) {
+    if (!question || !scenarios) {
       return NextResponse.json(
-        { error: 'Question, scenarios, and API key are required' },
+        { error: 'Question and scenarios are required' },
         { status: 400 }
+      );
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503 }
       );
     }
 

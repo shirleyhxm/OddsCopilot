@@ -124,13 +124,6 @@ export default function DecisionDetailPage() {
   }, [decisionId, router, supabase])
 
   const handleGenerateInsight = async () => {
-    const apiKey = sessionStorage.getItem('apiKey')
-
-    if (!apiKey) {
-      setInsightError('API key not found. Please return to dashboard and create a new decision.')
-      return
-    }
-
     setIsGeneratingInsight(true)
     setInsightError('')
 
@@ -143,7 +136,6 @@ export default function DecisionDetailPage() {
         body: JSON.stringify({
           question: decision?.decisionSummary,
           scenarios: scenarios,
-          apiKey,
         }),
       })
 
