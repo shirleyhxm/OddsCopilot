@@ -83,6 +83,15 @@ export default function WelcomePage() {
     },
   ]
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
+
   const canSubmit = lifeStage && riskTolerance
 
   return (
@@ -90,8 +99,16 @@ export default function WelcomePage() {
       <div className="w-full max-w-2xl fade-in">
         {/* Logo */}
         <div className="text-center mb-12">
-          <div className="text-amber text-xs font-medium tracking-[0.3em] uppercase mb-6">
-            ODDSMERA
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="text-amber text-xs font-medium tracking-[0.3em] uppercase">
+              ODDSMERA
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-text3 text-xs hover:text-text2 transition-colors"
+            >
+              Log out
+            </button>
           </div>
           <h1 className="font-serif text-5xl text-text mb-3 leading-tight">
             Your <em className="text-amber">personal</em> probability advisor.

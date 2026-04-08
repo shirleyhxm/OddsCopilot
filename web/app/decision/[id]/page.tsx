@@ -246,6 +246,15 @@ export default function DecisionDetailPage() {
     })
   }
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
+
   const getStars = (value: number = 5) => {
     const filled = Math.round(value / 2)
     return '●'.repeat(filled) + '○'.repeat(5 - filled)
@@ -261,9 +270,17 @@ export default function DecisionDetailPage() {
         <h1 className="text-text2 text-sm flex-1 text-center max-w-xl mx-auto truncate px-4">
           {decision.question}
         </h1>
-        <Link href="/dashboard" className="text-text3 text-sm hover:text-text2 transition-colors whitespace-nowrap">
-          ← Dashboard
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard" className="text-text3 text-sm hover:text-text2 transition-colors whitespace-nowrap">
+            ← Dashboard
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="text-text3 text-sm hover:text-text2 transition-colors"
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
       <div className="flex px-6 max-w-[2000px] mx-auto">

@@ -107,6 +107,15 @@ export default function DashboardPage() {
 
   const pendingOutcomes = decisions.filter(d => !d.outcome && d.scenarios)
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
@@ -143,12 +152,20 @@ export default function DashboardPage() {
           <Link href="/dashboard" className="text-amber text-xs font-medium tracking-[0.3em] uppercase">
             ODDSMERA
           </Link>
-          <Link
-            href="/profile"
-            className="text-text3 text-sm hover:text-text2 transition-colors"
-          >
-            Profile
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/profile"
+              className="text-text3 text-sm hover:text-text2 transition-colors"
+            >
+              Profile
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-text3 text-sm hover:text-text2 transition-colors"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
