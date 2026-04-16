@@ -17,6 +17,9 @@ function LoginForm() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Get trial decision ID from URL to pass through signup flow
+  const trialDecisionId = searchParams.get('trial')
+
   useEffect(() => {
     // Pre-select sign-up mode if coming from a "sign up" CTA
     if (searchParams.get('signup') === 'true') {
@@ -32,14 +35,21 @@ function LoginForm() {
 
     try {
       if (isSignUp) {
+        // Store trial decision ID in user metadata (persists across auth flow)
+        const userMetadata = trialDecisionId ? { trial_decision_id: trialDecisionId } : {}
+        console.log('🔍 Signing up with trial ID:', trialDecisionId)
+        console.log('🔍 User metadata being set:', userMetadata)
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
-            data: {},
+            data: userMetadata,
           },
         })
+
+        console.log('🔍 Signup response - user metadata:', data.user?.user_metadata)
 
         if (error) throw error
 

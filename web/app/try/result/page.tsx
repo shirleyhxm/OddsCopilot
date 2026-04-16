@@ -33,15 +33,20 @@ export default function TryResultPage() {
   const router = useRouter()
   const [tryData, setTryData] = useState<TryAnalysis | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [trialDecisionId, setTrialDecisionId] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('tryAnalysis')
+    const stored = localStorage.getItem('tryAnalysis')
     if (!stored) {
       router.push('/try')
       return
     }
     try {
-      setTryData(JSON.parse(stored))
+      const data = JSON.parse(stored)
+      setTryData(data)
+      // Get trial decision ID from stored data or localStorage
+      const trialId = data.trialDecisionId || localStorage.getItem('trialDecisionId')
+      setTrialDecisionId(trialId)
       // Show signup modal after a short delay so user sees the partial results first
       const timer = setTimeout(() => setShowModal(true), 2200)
       return () => clearTimeout(timer)
@@ -49,6 +54,12 @@ export default function TryResultPage() {
       router.push('/try')
     }
   }, [router])
+
+  // Helper to build signup URL with trial decision ID
+  const buildSignupUrl = () => {
+    const baseUrl = '/login?signup=true&from=try'
+    return trialDecisionId ? `${baseUrl}&trial=${trialDecisionId}` : baseUrl
+  }
 
   if (!tryData) {
     return (
@@ -97,7 +108,7 @@ export default function TryResultPage() {
               ← Try another
             </Link>
             <Link
-              href="/login?signup=true"
+              href={buildSignupUrl()}
               className="bg-amber hover:bg-amber/90 text-bg text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               Sign up to unlock →
@@ -221,7 +232,7 @@ export default function TryResultPage() {
                     Sign up free to see all scenarios, adjust probabilities, and unlock the full insight.
                   </p>
                   <Link
-                    href="/login?signup=true"
+                    href={buildSignupUrl()}
                     className="inline-block bg-amber hover:bg-amber/90 text-bg font-medium px-6 py-3 rounded-lg transition-colors"
                   >
                     Sign up to unlock →
@@ -246,7 +257,7 @@ export default function TryResultPage() {
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <Link
-                  href="/login?signup=true"
+                  href={buildSignupUrl()}
                   className="text-amber text-sm hover:underline font-medium"
                 >
                   Sign up to see key factors →
@@ -320,7 +331,7 @@ export default function TryResultPage() {
               Sign up to adjust probability estimates and get a full analysis of what the math reveals — and what it misses.
             </p>
             <Link
-              href="/login?signup=true"
+              href={buildSignupUrl()}
               className="block w-full bg-amber hover:bg-amber/90 text-bg py-3 rounded-md font-medium text-sm transition-colors text-center"
             >
               Unlock full insight →
@@ -374,7 +385,7 @@ export default function TryResultPage() {
             </div>
 
             <Link
-              href="/login?signup=true"
+              href={buildSignupUrl()}
               className="block w-full bg-amber hover:bg-amber/90 text-bg font-medium py-4 rounded-lg transition-colors text-center mb-3"
             >
               Create free account →

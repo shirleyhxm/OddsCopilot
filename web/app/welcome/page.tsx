@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type LifeStage = 'early-career' | 'mid-career' | 'senior' | 'transitioning' | 'other'
 type RiskTolerance = 'conservative' | 'moderate' | 'growth-oriented'
 
-export default function WelcomePage() {
+function WelcomeForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [name, setName] = useState('')
   const [lifeStage, setLifeStage] = useState<LifeStage | null>(null)
@@ -16,6 +17,31 @@ export default function WelcomePage() {
   const [context, setContext] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [hasTryAnalysis, setHasTryAnalysis] = useState(false)
+  const [trialDecisionId, setTrialDecisionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check for trial decision ID in URL params (works cross-browser)
+    const trialId = searchParams.get('trial')
+    console.log('Welcome page - trial ID from URL:', trialId)
+    if (trialId) {
+      console.log('✅ Found trial ID in URL params')
+      setTrialDecisionId(trialId)
+      setHasTryAnalysis(true)
+    } else {
+      // Fallback: check localStorage for same-browser scenario
+      const tryAnalysisData = localStorage.getItem('tryAnalysis')
+      const storedTrialId = localStorage.getItem('trialDecisionId')
+      console.log('Welcome page - checking localStorage:', { tryAnalysisData: !!tryAnalysisData, storedTrialId })
+      if (tryAnalysisData || storedTrialId) {
+        setHasTryAnalysis(true)
+        if (storedTrialId) {
+          console.log('✅ Found trial ID in localStorage')
+          setTrialDecisionId(storedTrialId)
+        }
+      }
+    }
+  }, [searchParams])
 
   const handleSubmit = async () => {
     if (!lifeStage || !riskTolerance) return
@@ -44,7 +70,118 @@ export default function WelcomePage() {
 
       if (profileError) throw profileError
 
-      // Redirect to dashboard
+      // Check if there's a trial decision to claim (prioritize server-side ID)
+      let claimedDecisionId: string | null = null
+
+      if (trialDecisionId) {
+        console.log('Attempting to claim trial decision:', trialDecisionId)
+        // Method 1: Claim trial decision from database (works cross-browser)
+        try {
+          // First, fetch the trial decision
+          const { data: trialDecision, error: fetchError } = await supabase
+            .from('trial_decisions')
+            .select('*')
+            .eq('id', trialDecisionId)
+            .is('claimed_by_user_id', null)
+            .single()
+
+          console.log('Trial decision fetch result:', { trialDecision, fetchError })
+
+          if (!fetchError && trialDecision) {
+            // Save the trial decision as a real decision
+            const { data: savedDecision, error: saveError } = await supabase
+              .from('decisions')
+              .insert({
+                user_id: user.id,
+                question: trialDecision.question,
+                category: trialDecision.category,
+                decision_summary: trialDecision.decision_summary,
+                context: trialDecision.context,
+                insider_prompt: trialDecision.insider_prompt,
+                scenarios: trialDecision.scenarios,
+                key_factors: trialDecision.key_factors,
+                expected_value_score: trialDecision.expected_value_score,
+                sensitivity_note: trialDecision.sensitivity_note,
+              })
+              .select()
+              .single()
+
+            console.log('Save decision result:', { savedDecision, saveError })
+
+            if (!saveError && savedDecision) {
+              // Mark the trial decision as claimed
+              const { error: claimError } = await supabase
+                .from('trial_decisions')
+                .update({
+                  claimed_by_user_id: user.id,
+                  claimed_at: new Date().toISOString()
+                })
+                .eq('id', trialDecisionId)
+
+              console.log('Claim trial decision result:', { claimError })
+
+              claimedDecisionId = savedDecision.id
+
+              // Clear localStorage
+              localStorage.removeItem('tryAnalysis')
+              localStorage.removeItem('trialDecisionId')
+
+              console.log('✅ Trial decision claimed successfully! Redirecting to:', savedDecision.id)
+            } else {
+              console.error('Failed to save decision:', saveError)
+            }
+          } else {
+            console.log('Trial decision not found or already claimed:', { fetchError })
+          }
+        } catch (err) {
+          console.error('Error claiming trial decision:', err)
+        }
+      } else {
+        console.log('No trial decision ID found')
+      }
+
+      // Method 2: Fallback to localStorage (same browser scenario)
+      if (!claimedDecisionId) {
+        const tryAnalysisData = localStorage.getItem('tryAnalysis')
+        if (tryAnalysisData) {
+          try {
+            const tryAnalysis = JSON.parse(tryAnalysisData)
+
+            const { data: savedDecision, error: saveError } = await supabase
+              .from('decisions')
+              .insert({
+                user_id: user.id,
+                question: tryAnalysis.question,
+                category: tryAnalysis.category,
+                decision_summary: tryAnalysis.analysis.decisionSummary,
+                context: tryAnalysis.analysis.context,
+                insider_prompt: tryAnalysis.analysis.insiderPrompt,
+                scenarios: tryAnalysis.analysis.scenarios,
+                key_factors: tryAnalysis.analysis.keyFactors,
+                expected_value_score: tryAnalysis.analysis.expectedValueScore,
+                sensitivity_note: tryAnalysis.analysis.sensitivityNote,
+              })
+              .select()
+              .single()
+
+            if (!saveError && savedDecision) {
+              claimedDecisionId = savedDecision.id
+              localStorage.removeItem('tryAnalysis')
+              localStorage.removeItem('trialDecisionId')
+            }
+          } catch (err) {
+            console.error('Error processing trial decision from localStorage:', err)
+          }
+        }
+      }
+
+      // Redirect to the claimed decision if available
+      if (claimedDecisionId) {
+        router.push(`/decision/${claimedDecisionId}`)
+        return
+      }
+
+      // Redirect to dashboard (if no trial decision or if saving failed)
       router.push('/dashboard')
     } catch (err: any) {
       console.error('Error saving profile:', err)
@@ -116,6 +253,21 @@ export default function WelcomePage() {
           <p className="text-text2 text-sm">
             Help me understand your context so I can give you better-calibrated scenarios.
           </p>
+          {hasTryAnalysis && (
+            <div className="mt-4 bg-green-dim border border-green/30 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <div className="text-green text-lg">✓</div>
+                <div>
+                  <div className="text-green text-sm font-medium mb-1">
+                    Your trial decision will be saved!
+                  </div>
+                  <div className="text-text2 text-xs leading-relaxed">
+                    Complete your profile and we'll save your decision analysis so you can access it anytime.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Form */}
@@ -234,5 +386,17 @@ export default function WelcomePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function WelcomePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="text-text3 text-sm">Loading...</div>
+      </div>
+    }>
+      <WelcomeForm />
+    </Suspense>
   )
 }

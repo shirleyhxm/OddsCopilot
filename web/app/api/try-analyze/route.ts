@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildDecisionAnalysisPrompt, AIDecisionAnalysis } from '@/lib/ai/prompt';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'edge';
 
@@ -77,6 +78,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Save trial decision to database (works across browsers)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const { data: trialDecision, error: dbError } = await supabase
+          .from('trial_decisions')
+          .insert({
+            question: decision,
+            category,
+            decision_summary: analysis.decisionSummary,
+            context: analysis.context,
+            insider_prompt: analysis.insiderPrompt,
+            scenarios: analysis.scenarios,
+            key_factors: analysis.keyFactors,
+            expected_value_score: analysis.expectedValueScore,
+            sensitivity_note: analysis.sensitivityNote,
+          })
+          .select('id')
+          .single();
+
+        if (!dbError && trialDecision) {
+          // Return both analysis and trial decision ID
+          return NextResponse.json({
+            analysis,
+            trialDecisionId: trialDecision.id
+          });
+        }
+      } catch (dbError) {
+        console.error('Error saving trial decision to database:', dbError);
+        // Continue without saving to DB - return just the analysis
+      }
+    }
+
+    // Fallback: return just the analysis if DB save failed
     return NextResponse.json({ analysis });
 
   } catch (error: any) {

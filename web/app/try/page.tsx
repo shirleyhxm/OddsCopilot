@@ -59,11 +59,17 @@ export default function TryPage() {
         throw new Error(data.error || 'Failed to analyze decision')
       }
 
-      // Store result in sessionStorage and navigate to result page
-      sessionStorage.setItem('tryAnalysis', JSON.stringify({
+      // Store trial decision ID if provided (for cross-browser signup)
+      if (data.trialDecisionId) {
+        localStorage.setItem('trialDecisionId', data.trialDecisionId)
+      }
+
+      // Also store in localStorage as fallback (persists in same browser)
+      localStorage.setItem('tryAnalysis', JSON.stringify({
         question: decision,
         category,
         analysis: data.analysis,
+        trialDecisionId: data.trialDecisionId,
       }))
 
       router.push('/try/result')
@@ -94,7 +100,7 @@ export default function TryPage() {
               Sign in
             </Link>
             <Link
-              href="/login?signup=true"
+              href="/login?signup=true&from=try"
               className="bg-amber hover:bg-amber/90 text-bg text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               Sign up free
@@ -208,7 +214,7 @@ export default function TryPage() {
 
         <p className="text-text3 text-xs text-center mt-4">
           Sign up to save decisions, adjust probabilities, and unlock the full insight.{' '}
-          <Link href="/login?signup=true" className="text-amber hover:underline">
+          <Link href="/login?signup=true&from=try" className="text-amber hover:underline">
             Create free account →
           </Link>
         </p>
