@@ -44,7 +44,7 @@ function LoginForm() {
           email,
           password,
           options: {
-            emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
             data: userMetadata,
           },
         })
